@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# grep LOGGREP from LOGFILE to APPPATH
+#
+APPPATH="/path/to/php/folder"
+LOGFILE="error log file"
+LOGGREP="error"
+
+grep -E $LOGGREP /var/log/$LOGFILE > $APPPATH/tmp.log
+
