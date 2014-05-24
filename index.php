@@ -1,35 +1,31 @@
 <?php
 /* Script Base by David Zimmerman http://www.dizzysoft.com/
 
-Rebuild by Maik Vattersen http://www.exigem.com/
+Rebuild by M. Vattersen http://www.mvattersen.de/
 
-Use a cronjob to push logdata from system to file
+Use a cronjob to push logdata from system to file and parse the data to an RSS Feed
 
 Please feel free to use as long as you give me credit and understand there is no warranty that comes with this script.
 */
 
-// check for installer file
+// define some constants
+define('APPNAME', str_replace('/', '', dirname($_SERVER['PHP_SELF'])) );	// Pure foldername
+define('APPLANG', substr( $_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2 ) );			// browser lang (en, de, etc)	
+define('PATH', $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']));
+define('URL', 'http://' . PATH);
+
+// check for installer file to help install the neccessary cronjob
 if (file_exists('install.php'))
 {
-	define('PATH', $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']));
-	define('URL', 'http://' . PATH);
-	define('APPNAME', str_replace('/', '', dirname($_SERVER['PHP_SELF'])) );
-	define('APPLANG', substr( $_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2 ) );
-	
 	// Load the installation check
 	return include 'install.php';
 }
 
 
 $file = "tmp.log";
-$max = 3; // max number of entries
+$max = 10; // max number of entries
 
 $lines= array_reverse(file($file));
-//$lines = array_unique($lines);
-  
-//echo "<pre>";
-//print_r($lines);
-//echo "</pre>";
 
 $url= 'http://'.$_SERVER['HTTP_HOST'];
 $url.= substr($_SERVER['REQUEST_URI'], 0, strrpos($_SERVER['REQUEST_URI'],'/')+1);
@@ -48,40 +44,25 @@ $root->appendChild($version);
 $text= $doc->createTextNode('2.0');
 $version->appendChild($text);
 
-$content = $doc->createAttribute('xmlns:content'); $root->appendChild($content); 
-$text= $doc->createTextNode('http://purl.org/rss/1.0/modules/content/'); $content->appendChild($text);
-
-$wfw = $doc->createAttribute('xmlns:wfw'); $root->appendChild($wfw);
-$text= $doc->createTextNode('http://wellformedweb.org/CommentAPI/'); $wfw->appendChild($text);
-
-$dc = $doc->createAttribute('xmlns:dc'); $root->appendChild($dc);
-$text= $doc->createTextNode('http://purl.org/dc/elements/1.1/'); $dc->appendChild($text);
-
-$atom = $doc->createAttribute('xmlns:atom'); $root->appendChild($atom);
-$text= $doc->createTextNode('http://www.w3.org/2005/Atom'); $atom->appendChild($text);
-
-$sy = $doc->createAttribute('xmlns:sy'); $root->appendChild($sy);
-$text= $doc->createTextNode('http://purl.org/rss/1.0/modules/syndication/'); $sy->appendChild($text);
-
-$slash = $doc->createAttribute('xmlns:slash'); $root->appendChild($slash);
-$text= $doc->createTextNode('http://purl.org/rss/1.0/modules/slash/'); $slash->appendChild($text);
-
 $channel= $doc->createElement('channel');
 $root->appendChild($channel);
 
 // nodes of channel
 $info= $doc->createElement('title');
 $channel->appendChild($info);
-$text= $doc->createTextNode('Error log for '.$url);
+$text= $doc->createTextNode(APPNAME . ' RSS Feed');
 $info->appendChild($text);
-$info= $doc->createElement('link');
-$channel->appendChild($info);
-$text= $doc->createTextNode($url.'error_log');
-$info->appendChild($text);
+
 $info= $doc->createElement('description');
 $channel->appendChild($info);
-$text= $doc->createTextNode("This is the Ban log for $url");
+$text= $doc->createTextNode("The RSS Newsfeed from $url");
 $info->appendChild($text);
+
+$info= $doc->createElement('link');
+$channel->appendChild($info);
+$text= $doc->createTextNode($url);
+$info->appendChild($text);
+
 $info= $doc->createElement('lastBuildDate');
 $channel->appendChild($info);
 $text= $doc->createTextNode(Date('r')); // now
@@ -104,18 +85,22 @@ $channel->appendChild($item);
 
 $child = $doc->createElement('title');
 $item->appendChild($child);
-$title = preg_replace("/\[([^\[\]]++|(?R))*+\]/", "", $line);
 //	Regex will convert this:
 //		  This [text [more text]][also text] is cool
 //	to this:
 //		  This is cool
-$title = /* strpos($line, "\n", 50) . " " . */ $title ;
+$title = substr(substr(preg_replace("/\[([^\[\]]++|(?R))*+\]/", "", $line), 0, -1), 3);
 $value = $doc->createTextNode($title);
+$child->appendChild($value);
+
+$child = $doc->createElement('link');
+$item->appendChild($child);
+$value = $doc->createTextNode( $url );
 $child->appendChild($value);
 
 $child = $doc->createElement('description');
 $item->appendChild($child);
-$value = $doc->createTextNode($line);
+$value = $doc->createTextNode( substr($line, 0 , -1) );
 $child->appendChild($value);
 
 $child = $doc->createElement('pubDate');
